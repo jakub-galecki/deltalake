@@ -1,43 +1,64 @@
-package main
+package deltalake
+
+import (
+	"encoding/json"
+	"io"
+)
 
 /*
 todo:
 	[] add log Checkpoints
 */
 
-const logSubDir = "_log"
-
-type changeMetadata struct {
-	table string
-	cols  []string
-}
+const logPrefix = "_log"
 
 const (
 	_add    = 0
 	_remove = 1
 )
 
-type dataObjectAction struct {
-	action int
-	table  string
-	file   string
+type action interface {
+	write(io.Writer) (int, error)
 }
 
-type jsonable interface {
-	Json() []byte
+type changeMetadata struct {
+	Table   string
+	Columns []string
+}
+
+type dataObjectAction struct {
+	Action int
+	Table  string
+	File   string
 }
 
 func createChangeMetadaAction(table string, cols []string) *changeMetadata {
 	return &changeMetadata{
-		table: table,
-		cols:  cols,
+		Table:   table,
+		Columns: cols,
 	}
+}
+
+func (cm *changeMetadata) write(w io.Writer) (int, error) {
+	raw, err := json.Marshal(cm)
+	if err != nil {
+		return 0, err
+	}
+	return w.Write(raw)
 }
 
 func createDataObjAction(table, file string, action int) *dataObjectAction {
 	return &dataObjectAction{
-		action: action,
-		table:  table,
-		file:   file,
+		Action: action,
+		Table:  table,
+		File:   file,
 	}
+}
+
+func (da *dataObjectAction) write(w io.Writer) (int, error) {
+	raw, err := json.Marshal(da)
+	if err != nil {
+		return 0, err
+	}
+	return w.Write(raw)
 }

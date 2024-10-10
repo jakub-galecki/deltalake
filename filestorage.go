@@ -1,4 +1,4 @@
-package main
+package deltalake
 
 import (
 	"io"
@@ -8,10 +8,10 @@ import (
 	"strings"
 )
 
-type storage interface {
-	write(string, []byte) error
-	list(string, string) ([]string, error)
-	read(string) (io.ReadCloser, error)
+type ObjectStorage interface {
+	Write(string, []byte) error
+	List(string, string) ([]string, error)
+	Read(string) (io.ReadCloser, error)
 }
 
 type fileStorage struct {
