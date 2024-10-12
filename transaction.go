@@ -21,7 +21,9 @@ type transaction struct {
 
 	// snapshot []any
 
-	actions []action // todo: make actions on specific table
+	actions []action
+
+	tables []table // maybe move actions on specific table
 
 	buffer   bytes.Buffer // todo: buffer manager  mapping table->rows
 	commited atomic.Bool
