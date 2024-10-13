@@ -6,6 +6,8 @@ type DeltaStorage interface {
 
 type delta struct {
 	internalStorage ObjectStorage
+
+	// todo: table cache
 }
 
 func New(objstorage ObjectStorage) DeltaStorage {

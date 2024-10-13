@@ -20,10 +20,7 @@ type transaction struct {
 	d *delta
 
 	// snapshot []any
-
-	actions []action
-
-	tables []table // maybe move actions on specific table
+	tables map[string]table // open tables in the transaction
 
 	buffer   bytes.Buffer // todo: buffer manager  mapping table->rows
 	commited atomic.Bool
@@ -72,8 +69,10 @@ func (tx *transaction) commit() error {
 
 func (tx *transaction) logAndApply() error {
 	var buf bytes.Buffer
-	for _, a := range tx.actions {
-		_, err := a.write(&buf)
+	// a bit slow because we are iterating over every table
+	// instead of the changed ones
+	for _, t := range tx.tables {
+		err := t.write(&buf)
 		if err != nil {
 			return err
 		}
