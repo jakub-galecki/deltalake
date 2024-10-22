@@ -32,7 +32,7 @@ type dataObjectAction struct {
 	File   string
 }
 
-func createChangeMetadaAction(table string, cols []string) *changeMetadata {
+func newChangeMetadaAction(table string, cols []string) *changeMetadata {
 	return &changeMetadata{
 		Table:   table,
 		Columns: cols,
@@ -47,7 +47,7 @@ func (cm *changeMetadata) write(w io.Writer) (int, error) {
 	return w.Write(raw)
 }
 
-func createDataObjAction(table, file string, action int) *dataObjectAction {
+func newDataObjAction(table, file string, action int) *dataObjectAction {
 	return &dataObjectAction{
 		Action: action,
 		Table:  table,

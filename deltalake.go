@@ -19,7 +19,3 @@ func New(objstorage ObjectStorage) DeltaStorage {
 func (d *delta) NewTransaction() *transaction {
 	return newTransaction(d)
 }
-
-func (d *delta) getActions() {
-
-}

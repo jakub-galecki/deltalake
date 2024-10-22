@@ -20,12 +20,24 @@ type fileStorage struct {
 	// todo: add cache since files are immutable
 }
 
+func newFileStorage(dir string) ObjectStorage {
+	fStorage := &fileStorage{
+		dir: dir,
+	}
+	fStorage.ensureDir()
+	return fStorage
+}
+
+func (fs *fileStorage) ensureDir() {
+	_ = os.Mkdir(fs.dir, os.ModePerm)
+}
+
 // write implements put-if-absent so the file will not be created if one already
 // exists
-func (fs *fileStorage) write(file string, data []byte) error {
+func (fs *fileStorage) Write(file string, data []byte) error {
 	f, err := os.OpenFile(fs.path(file), os.O_WRONLY|os.O_EXCL|os.O_CREATE, 0644)
 	if err != nil {
-		return nil
+		return err
 	}
 	defer f.Close()
 	_, err = f.Write(data)
@@ -42,7 +54,7 @@ func (fs *fileStorage) write(file string, data []byte) error {
 // the list of files is just returned.
 // Parameter subdir specifies subdirectory that should be searched. IF it is empty
 // current directory for fs will be searched.
-func (fs *fileStorage) list(subdir, pre string) []string {
+func (fs *fileStorage) List(subdir, pre string) ([]string, error) {
 	root := func() string {
 		if subdir == "" {
 			return fs.dir
@@ -63,11 +75,11 @@ func (fs *fileStorage) list(subdir, pre string) []string {
 		}
 		return nil
 	})
-	return fileNames
+	return fileNames, nil
 }
 
 // read returns file instance, it is responsibilty of the caller to close the file
-func (fs *fileStorage) read(file string) (io.ReadCloser, error) {
+func (fs *fileStorage) Read(file string) (io.ReadCloser, error) {
 	f, err := os.Open(fs.path(file))
 	if err != nil {
 		return nil, err

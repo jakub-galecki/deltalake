@@ -15,10 +15,8 @@ type table struct {
 	name    string
 	columns []string
 
-	files []string // underlying table files
-	prev  []action
-
-	actions []action // actions performed in the current transaction, not comitted yet
+	files   []string // underlying table files
+	actions []action
 
 	dirty bool // if any data was changed in the transaction
 }
@@ -65,7 +63,6 @@ func (tb *tableBuilder) build() *table {
 		name:    tb.name,
 		columns: tb.columns,
 		files:   tb.files,
-		prev:    tb.actions,
-		actions: make([]action, 0, _initActionCap),
+		actions: tb.actions,
 	}
 }
