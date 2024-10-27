@@ -22,6 +22,7 @@ type action interface {
 	write(io.Writer) (int, error)
 	serialize() ([]byte, error)
 	getKind() LogKind
+	getTable() string
 }
 
 type changeMetadata struct {
@@ -58,6 +59,10 @@ func (cm *changeMetadata) getKind() LogKind {
 	return ChangeMetadata
 }
 
+func (cm *changeMetadata) getTable() string {
+	return cm.Table
+}
+
 func newDataObjAction(table, file string, action int) *dataObjectAction {
 	return &dataObjectAction{
 		Action: action,
@@ -80,6 +85,10 @@ func (da *dataObjectAction) serialize() ([]byte, error) {
 
 func (da *dataObjectAction) getKind() LogKind {
 	return DataObject
+}
+
+func (da *dataObjectAction) getTable() string {
+	return da.Table
 }
 
 type LogKind int

@@ -40,17 +40,24 @@ type tableBuilder struct {
 	actions []action
 }
 
+func newTableBuilder(name string) *tableBuilder {
+	return &tableBuilder{
+		name:    name,
+		columns: make([]string, 0),
+		files:   make([]string, 0),
+		actions: make([]action, 0),
+	}
+}
+
 func (tb *tableBuilder) add(a action) *tableBuilder {
 	// todo: // refactor actions
-	switch a.(type) {
+	switch a := a.(type) {
 	case *changeMetadata:
-		cm := a.(*changeMetadata)
-		tb.columns = cm.Columns
+		tb.columns = a.Columns
 		return tb
 	case *dataObjectAction:
-		doa := a.(*dataObjectAction)
 		tb.actions = append(tb.actions, a)
-		tb.files = append(tb.files, doa.File)
+		tb.files = append(tb.files, a.File)
 		return tb
 	default:
 		slog.Error("unsuported action")

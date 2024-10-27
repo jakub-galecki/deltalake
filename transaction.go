@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -45,7 +47,18 @@ func (tx *transaction) init(d *delta) {
 	tx.tables = make(map[string]*table)
 	tx.actions = make([]action, 0)
 	tx.buffer = make(map[string][][]any)
-	tx.id = 0
+
+	getTxId := func(name string) int64 {
+		raw, found := strings.CutPrefix(name, "_log_")
+		if !found {
+			return 0
+		}
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return 0
+		}
+		return id
+	}
 
 	previousLogs := func() []action {
 		all, err := tx.d.internalStorage.List("", logPrefix)
@@ -53,9 +66,11 @@ func (tx *transaction) init(d *delta) {
 			slog.Error("error while searching for logs", slog.Any("error", err))
 			return nil
 		}
+
 		l := newLogs()
 		actions := make([]action, 0)
 		for _, a := range all {
+			tx.id = getTxId(a) + 1
 			slog.Debug("processing previous log", slog.String("id", a))
 			reader, err := tx.d.internalStorage.Read(a)
 			if err != nil {
@@ -83,7 +98,21 @@ func (tx *transaction) init(d *delta) {
 	}()
 
 	// build tables based on previous logs
-	_ = previousLogs
+
+	builders := make(map[string]*tableBuilder)
+	for _, a := range previousLogs {
+		t := a.getTable()
+		tb, ok := builders[t]
+		if !ok {
+			builders[t] = newTableBuilder(t)
+			tb = builders[t]
+		}
+		tb.add(a)
+	}
+
+	for t, tb := range builders {
+		tx.tables[t] = tb.build()
+	}
 }
 
 func (tx *transaction) create(table string, columns []string) error {
@@ -108,6 +137,14 @@ func (tx *transaction) put(table string, values []any) error {
 	if tx.buffer[table] == nil {
 		tx.buffer[table] = make([][]any, 0)
 	}
+
+	if len(tx.buffer[table]) == 10000 {
+		// todo: make async
+		if err := tx.flushTable(table); err != nil {
+			return err
+		}
+	}
+
 	tx.buffer[table] = append(tx.buffer[table], values)
 	return nil
 }
@@ -158,12 +195,13 @@ func (tx *transaction) flushTable(name string) error {
 	}
 	ao := newDataObjAction(do.Table, do.fileName, _add)
 	tx.actions = append(tx.actions, ao)
+	tx.buffer[name] = tx.buffer[name][:0]
 	return nil
 }
 
 func (tx *transaction) flushTables() error {
 	var err error
-	for table, _ := range tx.buffer {
+	for table := range tx.buffer {
 		if flushErr := tx.flushTable(table); flushErr != nil {
 			err = multierr.Append(err, flushErr)
 		}

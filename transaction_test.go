@@ -1,6 +1,7 @@
 package deltalake
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path"
@@ -44,5 +45,30 @@ func TestTransaction(t *testing.T) {
 	txRead := cl.NewTransaction()
 	_ = txRead
 
-	//cleanup(testdir)
+	assert.NoError(t, txRead.commit())
+
+	// cleanup(testdir)
+}
+
+func TestTransaction2(t *testing.T) {
+	testdir := getTestDir()
+	objStorage := newFileStorage(testdir)
+	cl := New(objStorage)
+	tx := cl.NewTransaction()
+	assert.NoError(t, tx.create("foo", []string{"name1", "name2", "val1", "val2"}))
+
+	for i := 0; i <= 1000000; i++ {
+		assert.NoError(t, tx.put("foo", []any{
+			fmt.Sprintf("foo%d", i),
+			fmt.Sprintf("bar%d", i+20),
+			i, i + 100,
+		}))
+	}
+
+	assert.NoError(t, tx.commit())
+
+	txRead := cl.NewTransaction()
+	_ = txRead
+
+	// cleanup(testdir)
 }
