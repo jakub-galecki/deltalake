@@ -1,9 +1,9 @@
 package deltalake
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -46,19 +46,44 @@ func (tx *transaction) init(d *delta) {
 	tx.actions = make([]action, 0)
 	tx.buffer = make(map[string][][]any)
 	tx.id = 0
-	// getPreviousLogs := func() []string {
-	// 	all, err := tx.d.internalStorage.List("", logPrefix)
-	// 	if err != nil {
-	// 		slog.Error("error while searching for logs", slog.Any("error", err))
-	// 		return nil
-	// 	}
-	// 	for _, a := range all {
 
-	// 	}
-	// 	return nil
-	// }
+	previousLogs := func() []action {
+		all, err := tx.d.internalStorage.List("", logPrefix)
+		if err != nil {
+			slog.Error("error while searching for logs", slog.Any("error", err))
+			return nil
+		}
+		l := newLogs()
+		actions := make([]action, 0)
+		for _, a := range all {
+			slog.Debug("processing previous log", slog.String("id", a))
+			reader, err := tx.d.internalStorage.Read(a)
+			if err != nil {
+				slog.Error("error while getting log file", slog.String("id", a), slog.Any("error", err))
+				return nil
+			}
+			raw, err := io.ReadAll(reader)
+			if err != nil {
+				slog.Error("error while reading log file", slog.String("id", a), slog.Any("error", err))
+				return nil
+			}
+			l, err := l.deserialize(raw)
+			if err != nil {
+				slog.Error("error while deserializing log", slog.String("id", a), slog.Any("error", err))
+				return nil
+			}
+			acs, err := l.actions()
+			if err != nil {
+				slog.Error("error while deserializing actions", slog.String("id", a), slog.Any("error", err))
+				return nil
+			}
+			actions = append(actions, acs...)
+		}
+		return actions
+	}()
 
-	// previousLogs := getPreviousLogs()
+	// build tables based on previous logs
+	_ = previousLogs
 }
 
 func (tx *transaction) create(table string, columns []string) error {
@@ -147,13 +172,18 @@ func (tx *transaction) flushTables() error {
 }
 
 func (tx *transaction) logAndApply() error {
-	var buf bytes.Buffer
+	l := newLogs()
 	for _, a := range tx.actions {
-		_, err := a.write(&buf)
+		le, err := newLogEntry(a)
 		if err != nil {
 			return err
 		}
+		l = l.append(le)
 	}
 	filname := fmt.Sprintf("%s_%d", logPrefix, tx.id)
-	return tx.d.internalStorage.Write(filname, buf.Bytes())
+	rawLogs, err := l.serialize()
+	if err != nil {
+		return err
+	}
+	return tx.d.internalStorage.Write(filname, rawLogs)
 }

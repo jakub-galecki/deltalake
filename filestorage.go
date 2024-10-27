@@ -2,6 +2,7 @@ package deltalake
 
 import (
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -29,7 +30,10 @@ func newFileStorage(dir string) ObjectStorage {
 }
 
 func (fs *fileStorage) ensureDir() {
-	_ = os.Mkdir(fs.dir, os.ModePerm)
+	err := os.MkdirAll(fs.dir, os.ModePerm)
+	if err != nil {
+		slog.Error("error creating table dir", slog.Any("error", err))
+	}
 }
 
 // write implements put-if-absent so the file will not be created if one already
