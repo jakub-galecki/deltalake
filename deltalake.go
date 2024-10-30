@@ -4,18 +4,35 @@ type DeltaStorage interface {
 	NewTransaction() *transaction
 }
 
+type Iterator interface {
+	First() ([]any, error)
+	Next() ([]any, error)
+}
+
 type delta struct {
 	internalStorage ObjectStorage
 
+	opts *Opts
 	// todo: table cache
 }
 
-func New(objstorage ObjectStorage) DeltaStorage {
+func New(objstorage ObjectStorage, opt *Opts) DeltaStorage {
 	return &delta{
 		internalStorage: objstorage,
+		opts:            opt,
 	}
 }
 
 func (d *delta) NewTransaction() *transaction {
 	return newTransaction(d)
+}
+
+type Opts struct {
+	MaxMemoryBufferSz int
+}
+
+func DefaultOpts() *Opts {
+	return &Opts{
+		MaxMemoryBufferSz: 10000,
+	}
 }

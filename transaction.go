@@ -104,7 +104,7 @@ func (tx *transaction) init(d *delta) {
 		t := a.getTable()
 		tb, ok := builders[t]
 		if !ok {
-			builders[t] = newTableBuilder(t)
+			builders[t] = newTableBuilder(t, tx.d.internalStorage)
 			tb = builders[t]
 		}
 		tb.add(a)
@@ -120,7 +120,7 @@ func (tx *transaction) create(table string, columns []string) error {
 		return errors.New("table exists")
 	}
 	tx.buffer[table] = make([][]any, 0)
-	tx.tables[table] = newTable(table)
+	tx.tables[table] = newTable(table, tx.d.internalStorage)
 
 	cm := newChangeMetadaAction(table, columns)
 	tx.actions = append(tx.actions, cm)
@@ -138,7 +138,7 @@ func (tx *transaction) put(table string, values []any) error {
 		tx.buffer[table] = make([][]any, 0)
 	}
 
-	if len(tx.buffer[table]) == 10000 {
+	if len(tx.buffer[table]) == tx.d.opts.MaxMemoryBufferSz {
 		// todo: make async
 		if err := tx.flushTable(table); err != nil {
 			return err
@@ -182,6 +182,7 @@ func (tx *transaction) flushTable(name string) error {
 		return errors.New("table not found in memory")
 	}
 
+	// todo: add table to transaction cache
 	do := &dataObject{
 		Id:    uuid.NewString(),
 		Table: name,
@@ -224,4 +225,12 @@ func (tx *transaction) logAndApply() error {
 		return err
 	}
 	return tx.d.internalStorage.Write(filname, rawLogs)
+}
+
+func (tx *transaction) Iter(name string) (Iterator, error) {
+	table, ok := tx.tables[name]
+	if !ok {
+		return nil, errors.New("table does not exist")
+	}
+	return table.scan(), nil
 }

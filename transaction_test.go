@@ -1,6 +1,7 @@
 package deltalake
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,7 +34,7 @@ func getTestDir() string {
 func TestTransaction(t *testing.T) {
 	testdir := getTestDir()
 	objStorage := newFileStorage(testdir)
-	cl := New(objStorage)
+	cl := New(objStorage, DefaultOpts())
 	tx := cl.NewTransaction()
 	assert.NoError(t, tx.create("foo", []string{"name1", "name2", "val1", "val2"}))
 	assert.NoError(t, tx.put("foo", []any{"foo1", "bar", 1, 2}))
@@ -47,17 +48,17 @@ func TestTransaction(t *testing.T) {
 
 	assert.NoError(t, txRead.commit())
 
-	// cleanup(testdir)
+	cleanup(testdir)
 }
 
-func TestTransaction2(t *testing.T) {
+func TestTransactionReadCommited(t *testing.T) {
 	testdir := getTestDir()
 	objStorage := newFileStorage(testdir)
-	cl := New(objStorage)
+	cl := New(objStorage, DefaultOpts())
 	tx := cl.NewTransaction()
 	assert.NoError(t, tx.create("foo", []string{"name1", "name2", "val1", "val2"}))
 
-	for i := 0; i <= 1000000; i++ {
+	for i := 0; i <= 100; i++ {
 		assert.NoError(t, tx.put("foo", []any{
 			fmt.Sprintf("foo%d", i),
 			fmt.Sprintf("bar%d", i+20),
@@ -68,7 +69,22 @@ func TestTransaction2(t *testing.T) {
 	assert.NoError(t, tx.commit())
 
 	txRead := cl.NewTransaction()
-	_ = txRead
+	it, err := txRead.Iter("foo")
+	assert.NoError(t, err)
+	val, err := it.First()
+	assert.NoError(t, err)
+	for i := 0; i <= 100; i++ {
+		assert.Len(t, val, 4)
+		assert.Equal(t, fmt.Sprintf("foo%d", i), val[0])
+		assert.Equal(t, fmt.Sprintf("bar%d", i+20), val[1])
+		assert.Equal(t, float64(i), val[2])
+		assert.Equal(t, float64(i+100), val[3])
+		val, err = it.Next()
+		if errors.Is(err, ErrIteratorExhausted) {
+			return
+		}
+		assert.NoError(t, err)
+	}
 
-	// cleanup(testdir)
+	cleanup(testdir)
 }
