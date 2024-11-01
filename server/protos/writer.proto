@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package protos;
+option go_package = ".;protos";
+
+
+message CreateRequest {
+    string table = 1;
+    repeated string colums = 2;
+}
+
+message SetRequest {
+    string table = 1;
+    repeated string values = 2;
+}
+  
+message Error {
+    int32 status = 1;
+    string message = 2;
+}
+  
+service WriterService {
+    rpc Create(CreateRequest) returns (Error) {}
+    rpc Set(SetRequest) returns (Error)   {}
+}

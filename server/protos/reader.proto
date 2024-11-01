@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package protos;
+option go_package = ".;protos";
+
+message GetRequest {
+  string table = 1;
+}
+
+message DataResponse {
+  repeated string data = 1;
+}
+
+service ReaderService {
+  rpc Scan(GetRequest) returns (stream DataResponse)   {}
+}
