@@ -23,6 +23,30 @@ type Server struct {
 
 func (s *Server) Scan(in *protos.GetRequest, response grpc.ServerStreamingServer[protos.DataResponse]) error {
 	log.Printf("Received request to scan table: %s", in.Table)
+	table := in.Table
+
+	tx := s.delta.NewTransaction()
+	it, err := tx.Iter(table)
+	if err != nil {
+		return err
+	}
+
+	// todo: ugly architecture
+	mut := func(xs []any) []string {
+		res := make([]string, len(xs))
+		for i, v := range xs {
+			res[i] = fmt.Sprintf("%v", v)
+		}
+		return res
+	}
+
+	for v, err := it.First(); err != nil; v, err = it.Next() {
+		if err := response.Send(&protos.DataResponse{
+			Data: mut(v),
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
