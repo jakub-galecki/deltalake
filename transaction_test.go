@@ -33,40 +33,40 @@ func getTestDir() string {
 
 func TestTransaction(t *testing.T) {
 	testdir := getTestDir()
-	objStorage := newFileStorage(testdir)
+	objStorage := NewFileStorage(testdir)
 	cl := New(objStorage, DefaultOpts())
 	tx := cl.NewTransaction()
-	assert.NoError(t, tx.create("foo", []string{"name1", "name2", "val1", "val2"}))
-	assert.NoError(t, tx.put("foo", []any{"foo1", "bar", 1, 2}))
-	assert.NoError(t, tx.put("foo", []any{"foo1", "bar", 1, 2}))
-	assert.NoError(t, tx.put("foo", []any{"foo1", "bar", 1, 2}))
-	assert.NoError(t, tx.put("foo", []any{"foo1", "bar", 1, 2}))
-	assert.NoError(t, tx.commit())
+	assert.NoError(t, tx.Create("foo", []string{"name1", "name2", "val1", "val2"}))
+	assert.NoError(t, tx.Put("foo", []any{"foo1", "bar", 1, 2}))
+	assert.NoError(t, tx.Put("foo", []any{"foo1", "bar", 1, 2}))
+	assert.NoError(t, tx.Put("foo", []any{"foo1", "bar", 1, 2}))
+	assert.NoError(t, tx.Put("foo", []any{"foo1", "bar", 1, 2}))
+	assert.NoError(t, tx.Commit())
 
 	txRead := cl.NewTransaction()
 	_ = txRead
 
-	assert.NoError(t, txRead.commit())
+	assert.NoError(t, txRead.Commit())
 
 	cleanup(testdir)
 }
 
 func TestTransactionReadCommited(t *testing.T) {
 	testdir := getTestDir()
-	objStorage := newFileStorage(testdir)
+	objStorage := NewFileStorage(testdir)
 	cl := New(objStorage, DefaultOpts())
 	tx := cl.NewTransaction()
-	assert.NoError(t, tx.create("foo", []string{"name1", "name2", "val1", "val2"}))
+	assert.NoError(t, tx.Create("foo", []string{"name1", "name2", "val1", "val2"}))
 
 	for i := 0; i <= 100; i++ {
-		assert.NoError(t, tx.put("foo", []any{
+		assert.NoError(t, tx.Put("foo", []any{
 			fmt.Sprintf("foo%d", i),
 			fmt.Sprintf("bar%d", i+20),
 			i, i + 100,
 		}))
 	}
 
-	assert.NoError(t, tx.commit())
+	assert.NoError(t, tx.Commit())
 
 	txRead := cl.NewTransaction()
 	it, err := txRead.Iter("foo")

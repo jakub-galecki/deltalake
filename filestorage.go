@@ -21,7 +21,7 @@ type fileStorage struct {
 	// todo: add cache since files are immutable
 }
 
-func newFileStorage(dir string) ObjectStorage {
+func NewFileStorage(dir string) ObjectStorage {
 	fStorage := &fileStorage{
 		dir: dir,
 	}

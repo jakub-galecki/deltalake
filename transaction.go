@@ -115,7 +115,7 @@ func (tx *transaction) init(d *delta) {
 	}
 }
 
-func (tx *transaction) create(table string, columns []string) error {
+func (tx *transaction) Create(table string, columns []string) error {
 	if _, ok := tx.tables[table]; ok {
 		return errors.New("table exists")
 	}
@@ -128,7 +128,7 @@ func (tx *transaction) create(table string, columns []string) error {
 	return nil
 }
 
-func (tx *transaction) put(table string, values []any) error {
+func (tx *transaction) Put(table string, values []any) error {
 	// validate schema
 	if _, ok := tx.tables[table]; !ok {
 		return errors.New("table not found")
@@ -149,7 +149,7 @@ func (tx *transaction) put(table string, values []any) error {
 	return nil
 }
 
-func (tx *transaction) commit() error {
+func (tx *transaction) Commit() error {
 	defer transactionPool.Put(tx)
 
 	if tx.d == nil {
