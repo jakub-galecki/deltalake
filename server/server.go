@@ -2,28 +2,27 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
+	protos2 "github.com/deltalake/protos"
 	"log"
 	"log/slog"
 	"net"
 
 	"github.com/deltalake"
-	"github.com/deltalake/server/protos"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 type Server struct {
-	protos.UnimplementedReaderServiceServer
-	protos.UnimplementedWriterServiceServer
+	protos2.UnimplementedReaderServiceServer
+	protos2.UnimplementedWriterServiceServer
 
 	delta      deltalake.DeltaStorage
 	objStorage deltalake.ObjectStorage
 }
 
-func (s *Server) Scan(in *protos.GetRequest, response grpc.ServerStreamingServer[protos.DataResponse]) error {
+func (s *Server) Scan(in *protos2.GetRequest, response grpc.ServerStreamingServer[protos2.DataResponse]) (err error) {
 	log.Printf("Received request to scan table: %s", in.Table)
 	table := in.Table
 
@@ -45,22 +44,17 @@ func (s *Server) Scan(in *protos.GetRequest, response grpc.ServerStreamingServer
 	var (
 		v []any
 	)
-	for v, err = it.First(); err != nil; v, err = it.Next() {
-		if err := response.Send(&protos.DataResponse{
+	for v, err = it.First(); err == nil; v, err = it.Next() {
+		if err = response.Send(&protos2.DataResponse{
 			Data: mut(v),
 		}); err != nil {
-			return err
-		}
-	}
-	if err != nil {
-		if !errors.Is(err, deltalake.ErrIteratorExhausted) {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Server) Set(ctx context.Context, in *protos.SetRequest) (*protos.Error, error) {
+func (s *Server) Set(ctx context.Context, in *protos2.SetRequest) (*protos2.Error, error) {
 	// ugly
 	table, values := in.Table, in.Values
 	tx := s.delta.NewTransaction()
@@ -72,38 +66,38 @@ func (s *Server) Set(ctx context.Context, in *protos.SetRequest) (*protos.Error,
 		return res
 	}()
 	if err := tx.Put(table, input); err != nil {
-		return &protos.Error{
+		return &protos2.Error{
 			Status:  500,
 			Message: err.Error(),
 		}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return &protos.Error{
+		return &protos2.Error{
 			Status:  500,
 			Message: err.Error(),
 		}, err
 	}
-	return &protos.Error{
+	return &protos2.Error{
 		Status: 200,
 	}, nil
 }
 
-func (s *Server) Create(ctx context.Context, in *protos.CreateRequest) (*protos.Error, error) {
+func (s *Server) Create(ctx context.Context, in *protos2.CreateRequest) (*protos2.Error, error) {
 	table := in.Table
 	tx := s.delta.NewTransaction()
 	if err := tx.Create(table, in.Colums); err != nil {
-		return &protos.Error{
+		return &protos2.Error{
 			Status:  500,
 			Message: err.Error(),
 		}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return &protos.Error{
+		return &protos2.Error{
 			Status:  500,
 			Message: err.Error(),
 		}, err
 	}
-	return &protos.Error{
+	return &protos2.Error{
 		Status: 200,
 	}, nil
 }
@@ -137,8 +131,8 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	protos.RegisterReaderServiceServer(grpcServer, &s)
-	protos.RegisterWriterServiceServer(grpcServer, &s)
+	protos2.RegisterReaderServiceServer(grpcServer, &s)
+	protos2.RegisterWriterServiceServer(grpcServer, &s)
 	reflection.Register(grpcServer)
 
 	if err := grpcServer.Serve(lis); err != nil {
