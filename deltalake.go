@@ -1,7 +1,7 @@
 package deltalake
 
 type DeltaStorage interface {
-	NewTransaction() *transaction
+	NewTransaction() *Transaction
 }
 
 type Iterator interface {
@@ -23,7 +23,7 @@ func New(objstorage ObjectStorage, opt *Opts) DeltaStorage {
 	}
 }
 
-func (d *delta) NewTransaction() *transaction {
+func (d *delta) NewTransaction() *Transaction {
 	return newTransaction(d)
 }
 

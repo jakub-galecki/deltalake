@@ -16,32 +16,32 @@ import (
 
 var transactionPool = sync.Pool{
 	New: func() any {
-		return new(transaction)
+		return new(Transaction)
 	},
 }
 
-type transaction struct {
+type Transaction struct {
 	id int64
 
 	d *delta
 
 	// snapshot []any
 	// load tables lazily
-	tables map[string]*table // open tables in the transaction
+	tables map[string]*table // open tables in the Transaction
 
-	actions []action // actions performed in the current transaction, not comitted yet
+	actions []action // actions performed in the current Transaction, not comitted yet
 
 	buffer   map[string][][]any // todo: buffer manager  mapping table->rows
 	commited atomic.Bool
 }
 
-func newTransaction(d *delta) *transaction {
-	tx := transactionPool.Get().(*transaction)
+func newTransaction(d *delta) *Transaction {
+	tx := transactionPool.Get().(*Transaction)
 	tx.init(d)
 	return tx
 }
 
-func (tx *transaction) init(d *delta) {
+func (tx *Transaction) init(d *delta) {
 	tx.d = d
 	tx.commited.Store(false)
 	tx.tables = make(map[string]*table)
@@ -115,7 +115,7 @@ func (tx *transaction) init(d *delta) {
 	}
 }
 
-func (tx *transaction) Create(table string, columns []string) error {
+func (tx *Transaction) Create(table string, columns []string) error {
 	if _, ok := tx.tables[table]; ok {
 		return errors.New("table exists")
 	}
@@ -128,7 +128,7 @@ func (tx *transaction) Create(table string, columns []string) error {
 	return nil
 }
 
-func (tx *transaction) Put(table string, values []any) error {
+func (tx *Transaction) Put(table string, values []any) error {
 	// validate schema
 	if _, ok := tx.tables[table]; !ok {
 		return errors.New("table not found")
@@ -149,7 +149,7 @@ func (tx *transaction) Put(table string, values []any) error {
 	return nil
 }
 
-func (tx *transaction) Commit() error {
+func (tx *Transaction) Commit() error {
 	defer transactionPool.Put(tx)
 
 	if tx.d == nil {
@@ -157,7 +157,7 @@ func (tx *transaction) Commit() error {
 	}
 
 	if tx.commited.Load() {
-		return errors.New("transaction already commited")
+		return errors.New("Transaction already commited")
 	}
 
 	if len(tx.buffer) > 0 {
@@ -176,13 +176,13 @@ func (tx *transaction) Commit() error {
 	return nil
 }
 
-func (tx *transaction) flushTable(name string) error {
+func (tx *Transaction) flushTable(name string) error {
 	data, ok := tx.buffer[name]
 	if !ok {
 		return errors.New("table not found in memory")
 	}
 
-	// todo: add table to transaction cache
+	// todo: add table to Transaction cache
 	do := &dataObject{
 		Id:    uuid.NewString(),
 		Table: name,
@@ -200,7 +200,7 @@ func (tx *transaction) flushTable(name string) error {
 	return nil
 }
 
-func (tx *transaction) flushTables() error {
+func (tx *Transaction) flushTables() error {
 	var err error
 	for table := range tx.buffer {
 		if flushErr := tx.flushTable(table); flushErr != nil {
@@ -210,7 +210,7 @@ func (tx *transaction) flushTables() error {
 	return err
 }
 
-func (tx *transaction) logAndApply() error {
+func (tx *Transaction) logAndApply() error {
 	l := newLogs()
 	for _, a := range tx.actions {
 		le, err := newLogEntry(a)
@@ -227,10 +227,14 @@ func (tx *transaction) logAndApply() error {
 	return tx.d.internalStorage.Write(filname, rawLogs)
 }
 
-func (tx *transaction) Iter(name string) (Iterator, error) {
+func (tx *Transaction) Iter(name string) (Iterator, error) {
 	table, ok := tx.tables[name]
 	if !ok {
 		return nil, errors.New("table does not exist")
 	}
 	return table.scan(), nil
+}
+
+func (tx *Transaction) GetId() int64 {
+	return tx.id
 }

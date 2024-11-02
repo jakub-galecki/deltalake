@@ -5,13 +5,22 @@ option go_package = ".;protos";
 
 
 message CreateRequest {
-    string table = 1;
-    repeated string colums = 2;
+    optional int64 tx_id = 1;
+    string table = 2;
+    repeated string columns = 3;
 }
 
 message SetRequest {
-    string table = 1;
-    repeated string values = 2;
+    optional int64 tx_id = 1;
+    string table = 2;
+    repeated string values = 3;
+}
+
+message Empty {
+}
+
+message Transaction {
+    int64 tx_id = 1;
 }
   
 message Error {
@@ -22,4 +31,6 @@ message Error {
 service WriterService {
     rpc Create(CreateRequest) returns (Error) {}
     rpc Set(SetRequest) returns (Error)   {}
+    rpc NewTransaction(Empty) returns (Transaction) {}
+    rpc Commit(Transaction) returns (Error) {}
 }

@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WriterService_Create_FullMethodName = "/protos.WriterService/Create"
-	WriterService_Set_FullMethodName    = "/protos.WriterService/Set"
+	WriterService_Create_FullMethodName         = "/protos.WriterService/Create"
+	WriterService_Set_FullMethodName            = "/protos.WriterService/Set"
+	WriterService_NewTransaction_FullMethodName = "/protos.WriterService/NewTransaction"
+	WriterService_Commit_FullMethodName         = "/protos.WriterService/Commit"
 )
 
 // WriterServiceClient is the client API for WriterService service.
@@ -29,6 +31,8 @@ const (
 type WriterServiceClient interface {
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*Error, error)
 	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*Error, error)
+	NewTransaction(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Transaction, error)
+	Commit(ctx context.Context, in *Transaction, opts ...grpc.CallOption) (*Error, error)
 }
 
 type writerServiceClient struct {
@@ -59,12 +63,34 @@ func (c *writerServiceClient) Set(ctx context.Context, in *SetRequest, opts ...g
 	return out, nil
 }
 
+func (c *writerServiceClient) NewTransaction(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Transaction, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Transaction)
+	err := c.cc.Invoke(ctx, WriterService_NewTransaction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *writerServiceClient) Commit(ctx context.Context, in *Transaction, opts ...grpc.CallOption) (*Error, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Error)
+	err := c.cc.Invoke(ctx, WriterService_Commit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WriterServiceServer is the server API for WriterService service.
 // All implementations must embed UnimplementedWriterServiceServer
 // for forward compatibility.
 type WriterServiceServer interface {
 	Create(context.Context, *CreateRequest) (*Error, error)
 	Set(context.Context, *SetRequest) (*Error, error)
+	NewTransaction(context.Context, *Empty) (*Transaction, error)
+	Commit(context.Context, *Transaction) (*Error, error)
 	mustEmbedUnimplementedWriterServiceServer()
 }
 
@@ -80,6 +106,12 @@ func (UnimplementedWriterServiceServer) Create(context.Context, *CreateRequest) 
 }
 func (UnimplementedWriterServiceServer) Set(context.Context, *SetRequest) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
+}
+func (UnimplementedWriterServiceServer) NewTransaction(context.Context, *Empty) (*Transaction, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewTransaction not implemented")
+}
+func (UnimplementedWriterServiceServer) Commit(context.Context, *Transaction) (*Error, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
 }
 func (UnimplementedWriterServiceServer) mustEmbedUnimplementedWriterServiceServer() {}
 func (UnimplementedWriterServiceServer) testEmbeddedByValue()                       {}
@@ -138,6 +170,42 @@ func _WriterService_Set_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WriterService_NewTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WriterServiceServer).NewTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WriterService_NewTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WriterServiceServer).NewTransaction(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WriterService_Commit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Transaction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WriterServiceServer).Commit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WriterService_Commit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WriterServiceServer).Commit(ctx, req.(*Transaction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WriterService_ServiceDesc is the grpc.ServiceDesc for WriterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +220,14 @@ var WriterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Set",
 			Handler:    _WriterService_Set_Handler,
+		},
+		{
+			MethodName: "NewTransaction",
+			Handler:    _WriterService_NewTransaction_Handler,
+		},
+		{
+			MethodName: "Commit",
+			Handler:    _WriterService_Commit_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

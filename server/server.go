@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	protos2 "github.com/deltalake/protos"
@@ -20,13 +21,18 @@ type Server struct {
 
 	delta      deltalake.DeltaStorage
 	objStorage deltalake.ObjectStorage
+
+	txs map[int64]*deltalake.Transaction
 }
+
+var _ protos2.WriterServiceServer = (*Server)(nil)
+var _ protos2.ReaderServiceServer = (*Server)(nil)
 
 func (s *Server) Scan(in *protos2.GetRequest, response grpc.ServerStreamingServer[protos2.DataResponse]) (err error) {
 	log.Printf("Received request to scan table: %s", in.Table)
 	table := in.Table
 
-	tx := s.delta.NewTransaction()
+	tx, _ := s.getTx(in.TxId)
 	it, err := tx.Iter(table)
 	if err != nil {
 		return err
@@ -57,7 +63,7 @@ func (s *Server) Scan(in *protos2.GetRequest, response grpc.ServerStreamingServe
 func (s *Server) Set(ctx context.Context, in *protos2.SetRequest) (*protos2.Error, error) {
 	// ugly
 	table, values := in.Table, in.Values
-	tx := s.delta.NewTransaction()
+	tx, has := s.getTx(in.TxId)
 	input := func() []any {
 		res := make([]any, len(values))
 		for i, val := range values {
@@ -71,11 +77,13 @@ func (s *Server) Set(ctx context.Context, in *protos2.SetRequest) (*protos2.Erro
 			Message: err.Error(),
 		}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return &protos2.Error{
-			Status:  500,
-			Message: err.Error(),
-		}, err
+	if !has {
+		if err := tx.Commit(); err != nil {
+			return &protos2.Error{
+				Status:  500,
+				Message: err.Error(),
+			}, err
+		}
 	}
 	return &protos2.Error{
 		Status: 200,
@@ -83,26 +91,49 @@ func (s *Server) Set(ctx context.Context, in *protos2.SetRequest) (*protos2.Erro
 }
 
 func (s *Server) Create(ctx context.Context, in *protos2.CreateRequest) (*protos2.Error, error) {
+	tx, has := s.getTx(in.TxId)
 	table := in.Table
-	tx := s.delta.NewTransaction()
-	if err := tx.Create(table, in.Colums); err != nil {
+	if err := tx.Create(table, in.Columns); err != nil {
 		return &protos2.Error{
 			Status:  500,
 			Message: err.Error(),
 		}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return &protos2.Error{
-			Status:  500,
-			Message: err.Error(),
-		}, err
+
+	if !has {
+		if err := tx.Commit(); err != nil {
+			return &protos2.Error{
+				Status:  500,
+				Message: err.Error(),
+			}, err
+		}
 	}
+
 	return &protos2.Error{
 		Status: 200,
 	}, nil
 }
 
-// todo: add id to metada and store transactions
+func (s *Server) NewTransaction(context.Context, *protos2.Empty) (*protos2.Transaction, error) {
+	tx := s.delta.NewTransaction()
+	s.txs[tx.GetId()] = tx
+	return &protos2.Transaction{TxId: tx.GetId()}, nil
+}
+
+func (s *Server) Commit(ctx context.Context, in *protos2.Transaction) (*protos2.Error, error) {
+	tx, ok := s.txs[in.TxId]
+	if !ok {
+		return &protos2.Error{Status: 500, Message: "invalid transaction id"}, errors.New("invalid transaction id")
+	}
+
+	err := tx.Commit()
+	if err != nil {
+		return &protos2.Error{Status: 500, Message: err.Error()}, err
+	}
+	delete(s.txs, in.TxId)
+	return &protos2.Error{Status: 200}, nil
+}
+
 func main() {
 	storageType := flag.Int("storage", 0, "storage type: 0 - local")
 	storageDst := flag.String("storageDst", "", "where storage should be kept")
@@ -128,6 +159,7 @@ func main() {
 	s := Server{
 		delta:      d,
 		objStorage: store,
+		txs:        make(map[int64]*deltalake.Transaction),
 	}
 
 	grpcServer := grpc.NewServer()
@@ -138,4 +170,14 @@ func main() {
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
+}
+
+func (s *Server) getTx(id *int64) (*deltalake.Transaction, bool) {
+	if id == nil {
+		return s.delta.NewTransaction(), false
+	}
+	if tx, ok := s.txs[*id]; ok {
+		return tx, true
+	}
+	return s.delta.NewTransaction(), false
 }

@@ -24,7 +24,7 @@ type table struct {
 	files   []string // underlying table files
 	actions []action
 
-	dirty           bool // if any data was changed in the transaction
+	dirty           bool // if any data was changed in the Transaction
 	externalStorage ObjectStorage
 }
 

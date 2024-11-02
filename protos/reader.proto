@@ -4,11 +4,13 @@ package protos;
 option go_package = ".;protos";
 
 message GetRequest {
-  string table = 1;
+  optional int64 tx_id = 1;
+  string table = 2;
 }
 
 message DataResponse {
-  repeated string data = 1;
+  optional int64 tx_id = 1;
+  repeated string data = 2;
 }
 
 service ReaderService {
